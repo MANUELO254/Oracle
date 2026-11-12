@@ -141,7 +141,49 @@ contract OptimisticOracle {
         external
         payable
         returns (uint256)
-    { }
+    { 
+        uint256 assertionId = nextAssertionId;
+        nextAssertionId++;
+
+        if(msg.value == 0){
+            revert InvalidValue();
+        }
+
+        if(startTime == 0){
+            startTime = block.timestamp;
+        }
+
+        if(endTime == 0){
+            endTime = startTime + MINIMUM_ASSERTION_WINDOW;
+        }
+
+        if(startTime < block.timestamp){
+            revert InvalidTime();
+        }
+
+        if(endTime < startTime + MINIMUM_ASSERTION_WINDOW){
+            revert InvalidTime();
+        }
+        
+
+        assertions[assertionId] = EventAssertion({
+        asserter: msg.sender,
+        proposer: address(0),
+        disputer: address(o),
+        proposedOutcome: true,
+        resolvedOutcome: true,
+        reward: msg.value,
+        bond: reward * 2,
+        startTime: startTime,
+        endTime: endTime,
+        claimed:0,
+        winner: address(0),
+        description: description
+        });
+
+        emit EventAsserted(assertionId, msg.sender, description, msg.value);
+        return assertionId;
+    }
 
     /**
      * @notice Proposes the outcome (true or false) for an asserted event
@@ -150,7 +192,39 @@ contract OptimisticOracle {
      * @param assertionId The unique identifier of the assertion to propose an outcome for
      * @param outcome The proposed boolean outcome (true or false) for the event
      */
-    function proposeOutcome(uint256 assertionId, bool outcome) external payable { }
+    function proposeOutcome(uint256 assertionId, bool outcome) external payable { 
+        EventAssertion storage event = asserttions[assertionId];
+        if(event.asserter == address(0)){
+            revert AssertionNotFound();
+        }
+
+        if(event.proposer != address(0)){
+            revert AssertionProposed();
+        }
+
+        if(block.timestamp < event.startTime){
+            revert InvalidTime();
+        }
+
+        if(block.timestamp < event.endTime){
+            revert InvalidTime();
+        }
+
+        if(msg.value != event.bond){
+            revert InvalidValue();
+        }
+
+        event.proposer = msg.sender;
+        event.proposedOutcome = outcome;
+        event.endTime = block.timestamp + DISPUTE_WINDOW;
+
+        emit OutcomeProposed(assertionId, msg.sender, outcome);
+
+        
+    
+
+   
+    }
 
     /**
      * @notice Disputes a proposed outcome by bonding ETH
