@@ -113,7 +113,7 @@ contract OptimisticOracle {
      * @param _decider The new address that will act as decider for disputed assertions
      */
     function setDecider(address _decider) external onlyOwner {
-        address oldDecider = address(decider);
+        address oldDecider = decider;
         decider = _decider;
         emit DeciderUpdated(oldDecider, _decider);
     }
@@ -141,52 +141,35 @@ contract OptimisticOracle {
         external
         payable
         returns (uint256)
-    { 
+    {
+        if (msg.value == 0) revert InvalidValue();
+
+        if (startTime == 0) startTime = block.timestamp;
+        if (endTime == 0) endTime = startTime + MINIMUM_ASSERTION_WINDOW;
+
+        if (startTime < block.timestamp) revert InvalidTime();
+        if (endTime < startTime + MINIMUM_ASSERTION_WINDOW) revert InvalidTime();
 
         uint256 assertionId = nextAssertionId;
         nextAssertionId++;
 
-        if(msg.value == 0){
-            revert InvalidValue();
-        }
-
-        if(startTime == 0){
-            startTime =  block.timestamp;
-        }
-
-        if(endTime == 0){
-            endTime = startTime + MINIMUM_ASSERTION_WINDOW;
-        }
-
-        if(startTime < block.timestamp){
-            revert InvalidTime();
-        }
-
-        if(endTime < startTime + MINIMUM_ASSERTION_WINDOW){
-            revert InvalidTime();
-        }
-
         assertions[assertionId] = EventAssertion({
-        asserter: msg.sender,
-        proposer: address(0),
-        disputer: address(0),
-        proposedOutcome:  false,
-        resolvedOutcome: false,
-        reward: msg.value,
-        bond: msg.value * 2,
-        startTime: startTime,
-        endTime: endTime,
-        claimed: false,
-        winner: address(0),
-        description: description
+            asserter: msg.sender,
+            proposer: address(0),
+            disputer: address(0),
+            proposedOutcome: false,
+            resolvedOutcome: false,
+            reward: msg.value,
+            bond: msg.value * 2,
+            startTime: startTime,
+            endTime: endTime,
+            claimed: false,
+            winner: address(0),
+            description: description
         });
 
         emit EventAsserted(assertionId, msg.sender, description, msg.value);
         return assertionId;
-
-
-        
-
     }
 
     /**
@@ -196,35 +179,20 @@ contract OptimisticOracle {
      * @param assertionId The unique identifier of the assertion to propose an outcome for
      * @param outcome The proposed boolean outcome (true or false) for the event
      */
-    function proposeOutcome(uint256 assertionId, bool outcome) external payable { 
-
+    function proposeOutcome(uint256 assertionId, bool outcome) external payable {
         EventAssertion storage assertion = assertions[assertionId];
 
-        if(assertion.asserter == address(0)){
-            revert AssertionNotFound();
-        }
+        if (assertion.asserter == address(0)) revert AssertionNotFound();
+        if (assertion.proposer != address(0)) revert AssertionProposed();
+        if (block.timestamp < assertion.startTime) revert InvalidTime();
+        if (block.timestamp > assertion.endTime) revert InvalidTime();
+        if (msg.value != assertion.bond) revert InvalidValue();
 
-        if(assertion.proposer != address(0)){
-            revert AssertionProposed();
-        }
-
-        if( block.timestamp < assertion.startTime){
-            revert InvalidTime();
-        }
-
-        if(block.timestamp > assertion.endTime){
-            revert InvalidTime();
-        }
-
-        assertion.proposer =  msg.sender;
+        assertion.proposer = msg.sender;
         assertion.proposedOutcome = outcome;
         assertion.endTime = block.timestamp + DISPUTE_WINDOW;
 
         emit OutcomeProposed(assertionId, msg.sender, outcome);
-
-
-
-
     }
 
     /**
@@ -233,28 +201,17 @@ contract OptimisticOracle {
      *      and must be within the dispute window after proposal.
      * @param assertionId The unique identifier of the assertion to dispute
      */
-    function disputeOutcome(uint256 assertionId) external payable { 
-
+    function disputeOutcome(uint256 assertionId) external payable {
         EventAssertion storage assertion = assertions[assertionId];
 
-        if(assertion.proposer == address(0)){
-            revert NotProposedAssertion();
-        }
+        if (assertion.proposer == address(0)) revert NotProposedAssertion();
+        if (assertion.disputer != address(0)) revert ProposalDisputed();
+        if (block.timestamp > assertion.endTime) revert InvalidTime();
+        if (msg.value != assertion.bond) revert InvalidValue();
 
-        if(assertion.disputer != address(0)){
-            revert ProposalDisputed();
-        }
-
-        if(block.timestamp > assertion.endTime){
-            revert InvalidTime();
-        }
-
-        if(msg.value != assertion.bond){
-            revert InvalidValue();
-        }
-
-        
         assertion.disputer = msg.sender;
+
+        emit OutcomeDisputed(assertionId, msg.sender);
     }
 
     /**
@@ -263,41 +220,24 @@ contract OptimisticOracle {
      *      Can only be called after dispute window has passed without disputes.
      * @param assertionId The unique identifier of the assertion to claim rewards for
      */
-    function claimUndisputedReward(uint256 assertionId) external { 
-
+    function claimUndisputedReward(uint256 assertionId) external {
         EventAssertion storage assertion = assertions[assertionId];
 
-        if(assertion.proposer == address(0)){
-            revert NotProposedAssertion();
-        }
+        if (assertion.proposer == address(0)) revert NotProposedAssertion();
+        if (assertion.disputer != address(0)) revert ProposalDisputed();
+        if (block.timestamp <= assertion.endTime) revert InvalidTime();
+        if (assertion.claimed) revert AlreadyClaimed();
 
-        if(assertion.disputer != address(0)){
-            revert ProposalDisputed();
-        }
-
-        if(block.timestamp < assertion.endTime){
-            revert InvalidTime();
-        }
-
-        if(assertion.claimed == true){
-            revert AlreadyClaimed();
-        }
-
-        //setting up the required checks to payout
         assertion.claimed = true;
         assertion.resolvedOutcome = assertion.proposedOutcome;
         assertion.winner = assertion.proposer;
 
-        uint256 totalReward = (assertion.bond + assertion.reward);
+        uint256 totalReward = assertion.reward + assertion.bond;
 
-        (bool winnerSuccess, ) = payable(assertion.proposer).call{value: totalReward}("");
-        if(!winnerSuccess){
+        (bool success,) = payable(assertion.winner).call{ value: totalReward }("");
+        if (!success) revert TransferFailed();
 
-            revert TransferFailed();
-        }
-
-        emit RewardClaimed(assertionId, assertion.proposer, totalReward);
-
+        emit RewardClaimed(assertionId, assertion.winner, totalReward);
     }
 
     /**
@@ -306,45 +246,27 @@ contract OptimisticOracle {
      *      Can only be called after decider has settled the dispute.
      * @param assertionId The unique identifier of the disputed assertion to claim rewards for
      */
-    function claimDisputedReward(uint256 assertionId) external { 
-
+    function claimDisputedReward(uint256 assertionId) external {
         EventAssertion storage assertion = assertions[assertionId];
 
-        if(assertion.proposer == address(0)){
-            revert NotProposedAssertion();
-        }
-
-        if(assertion.disputer == address(0)){
-            revert NotDisputedAssertion();
-        }
-
-        if(assertion.winner == address(0)){
-            revert AwaitingDecider();
-        }
-
-        if(assertion.claimed){
-            revert AlreadyClaimed();
-        }
+        if (assertion.proposer == address(0)) revert NotProposedAssertion();
+        if (assertion.disputer == address(0)) revert NotDisputedAssertion();
+        if (assertion.winner == address(0)) revert AwaitingDecider();
+        if (assertion.claimed) revert AlreadyClaimed();
 
         assertion.claimed = true;
-        
-        //pay the bond to the decider
-        (bool deciderSuccess, ) = payable(decider).call{value: assertion.bond}("");
-        if(!deciderSuccess){
-            revert TransferFailed();
-        }
 
-        //pay the reward to the winner
+        // The loser's bond pays the decider for settling the dispute
+        (bool deciderSuccess,) = payable(decider).call{ value: assertion.bond }("");
+        if (!deciderSuccess) revert TransferFailed();
 
-        uint256 totalReward = (assertion.bond + assertion.reward);
+        // The winner gets the reward plus their own bond back
+        uint256 totalReward = assertion.reward + assertion.bond;
 
-        (bool winnerSuccess, ) = payable(assertion.winner).call{value: totalReward}("");
-        if(!winnerSuccess){
-            revert TransferFailed();
-        }
+        (bool winnerSuccess,) = payable(assertion.winner).call{ value: totalReward }("");
+        if (!winnerSuccess) revert TransferFailed();
 
         emit RewardClaimed(assertionId, assertion.winner, totalReward);
-        
     }
 
     /**
@@ -353,28 +275,17 @@ contract OptimisticOracle {
      *      Can only be called after assertion deadline has passed without any proposals.
      * @param assertionId The unique identifier of the expired assertion to claim refund for
      */
-    function claimRefund(uint256 assertionId) external { 
-
+    function claimRefund(uint256 assertionId) external {
         EventAssertion storage assertion = assertions[assertionId];
 
-        if(assertion.proposer == address(0)){
-            revert AssertionProposed();
-        }
-
-        if(block.timestamp <= assertion.endTime){
-            revert InvalidTime();
-        }
-
-        if(assertion.claimed){
-            revert AlreadyClaimed();
-        }
+        if (assertion.proposer != address(0)) revert AssertionProposed();
+        if (block.timestamp <= assertion.endTime) revert InvalidTime();
+        if (assertion.claimed) revert AlreadyClaimed();
 
         assertion.claimed = true;
-        
-        (bool refundSuccess, ) = payable(assertion.asserter).call{value: assertion.reward}("");
-        if(!refundSuccess){
-            revert TransferFailed();
-        }
+
+        (bool success,) = payable(assertion.asserter).call{ value: assertion.reward }("");
+        if (!success) revert TransferFailed();
 
         emit RefundClaimed(assertionId, assertion.asserter, assertion.reward);
     }
@@ -385,25 +296,15 @@ contract OptimisticOracle {
      * @param assertionId The unique identifier of the disputed assertion to settle
      * @param resolvedOutcome The decider's determination of the true outcome
      */
-    function settleAssertion(uint256 assertionId, bool resolvedOutcome) external onlyDecider { 
-
+    function settleAssertion(uint256 assertionId, bool resolvedOutcome) external onlyDecider {
         EventAssertion storage assertion = assertions[assertionId];
 
-        if(assertion.proposer == address(0)){
-            revert NotProposedAssertion();
-        }
-
-        if(decider == address(0)){
-            revert NotDisputedAssertion();
-        }
-
-        if(assertion.winner != address(0)){
-            revert AlreadySettled();
-        }
+        if (assertion.proposer == address(0)) revert NotProposedAssertion();
+        if (assertion.disputer == address(0)) revert NotDisputedAssertion();
+        if (assertion.winner != address(0)) revert AlreadySettled();
 
         assertion.resolvedOutcome = resolvedOutcome;
 
-        //Did the proposer’s answer match the decider’s ruling? If yes, the winner is the proposer. Otherwise, it’s the disputer.
         assertion.winner = assertion.proposedOutcome == resolvedOutcome ? assertion.proposer : assertion.disputer;
 
         emit AssertionSettled(assertionId, resolvedOutcome, assertion.winner);
@@ -415,7 +316,22 @@ contract OptimisticOracle {
      * @param assertionId The unique identifier of the assertion to check state for
      * @return The current State enum value representing the assertion's status
      */
-    function getState(uint256 assertionId) external view returns (State) { }
+    function getState(uint256 assertionId) external view returns (State) {
+        EventAssertion storage a = assertions[assertionId];
+
+        if (a.asserter == address(0)) return State.Invalid;
+        if (a.winner != address(0)) return State.Settled;
+        if (a.disputer != address(0)) return State.Disputed;
+
+        if (a.proposer == address(0)) {
+            if (block.timestamp > a.endTime) return State.Expired;
+            return State.Asserted;
+        }
+
+        // Proposed and undisputed: settled once the dispute window has passed
+        if (block.timestamp > a.endTime) return State.Settled;
+        return State.Proposed;
+    }
 
     /**
      * @notice Returns the final resolved outcome of a settled assertion
@@ -424,5 +340,18 @@ contract OptimisticOracle {
      * @param assertionId The unique identifier of the assertion to get resolution for
      * @return The final boolean outcome of the assertion
      */
-    function getResolution(uint256 assertionId) external view returns (bool) { }
+    function getResolution(uint256 assertionId) external view returns (bool) {
+        EventAssertion storage a = assertions[assertionId];
+
+        if (a.asserter == address(0)) revert AssertionNotFound();
+        if (a.proposer == address(0)) revert NotProposedAssertion();
+
+        if (a.disputer == address(0)) {
+            if (block.timestamp <= a.endTime) revert InvalidTime();
+            return a.proposedOutcome;
+        }
+
+        if (a.winner == address(0)) revert AwaitingDecider();
+        return a.resolvedOutcome;
+    }
 }
