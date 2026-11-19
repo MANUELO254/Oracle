@@ -1,0 +1,333 @@
+/*
+ * Oracle Games theme.
+ * Imported in app/layout.tsx after globals.css, so it overrides the daisyUI
+ * theme colours that the existing Scaffold-ETH components (tables, widgets,
+ * header) already use, and adds the og-* classes used by components/oracle/games.
+ */
+
+:root,
+html[data-theme] {
+  --og-ink: #12302c;
+  --og-ink-soft: #3e5551;
+  --og-ground: #e9f6f2;
+  --og-paper: #ffffff;
+  --og-paper-2: #f6fbf9;
+  --og-good: #e3f7e9;
+  --og-warn: #fff1c9;
+  --og-bad: #ffe4dc;
+  --og-muted: #eef0f0;
+  --og-council: #ffc94d;
+  --og-stakes: #ff7a59;
+  --og-bluff: #b9a6ff;
+  --og-accent: var(--og-ink);
+
+  /* daisyUI 5 theme variables, so existing components match the new look */
+  --color-base-100: #ffffff;
+  --color-base-200: #e9f6f2;
+  --color-base-300: #d4ebe4;
+  --color-base-content: #12302c;
+  --color-primary: #12302c;
+  --color-primary-content: #ffffff;
+  --color-secondary: #b9a6ff;
+  --color-secondary-content: #12302c;
+  --color-accent: #ffc94d;
+  --color-accent-content: #12302c;
+  --color-neutral: #12302c;
+  --color-neutral-content: #ffffff;
+  --color-info: #8fb4ff;
+  --color-info-content: #12302c;
+  --color-success: #7fd8be;
+  --color-success-content: #12302c;
+  --color-warning: #ffc94d;
+  --color-warning-content: #12302c;
+  --color-error: #ff7a59;
+  --color-error-content: #12302c;
+  --radius-box: 1.25rem;
+  --radius-field: 0.75rem;
+  --radius-selector: 999px;
+  --border: 2px;
+  --depth: 0;
+  --noise: 0;
+}
+
+body {
+  background: var(--og-ground);
+  color: var(--og-ink);
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+
+/* ---------- Page shell ---------- */
+
+.og-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 48px 24px 88px;
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+  color: var(--og-ink);
+}
+
+.og-home {
+  --og-accent: var(--og-ink);
+}
+.og-council {
+  --og-accent: var(--og-council);
+}
+.og-stakes {
+  --og-accent: var(--og-stakes);
+}
+.og-bluff {
+  --og-accent: var(--og-bluff);
+}
+
+/* ---------- Type ---------- */
+
+.og-display {
+  font-family: var(--font-display), var(--font-body), sans-serif;
+  font-weight: 800;
+  line-height: 1.05;
+  margin: 0;
+}
+
+.og-h1 {
+  font-size: clamp(2.5rem, 6vw, 3.75rem);
+}
+
+.og-h2 {
+  font-size: 1.875rem;
+}
+
+.og-pixel {
+  font-family: var(--font-pixel), monospace;
+  letter-spacing: 1px;
+}
+
+.og-lead {
+  margin: 0;
+  font-size: 1.1875rem;
+  line-height: 1.55;
+  max-width: 34rem;
+}
+
+.og-soft {
+  color: var(--og-ink-soft);
+}
+
+/* ---------- Surfaces ---------- */
+
+.og-card {
+  background: var(--og-paper);
+  border: 3px solid var(--og-ink);
+  border-radius: 24px;
+  box-shadow: 6px 6px 0 var(--og-ink);
+  padding: 24px;
+}
+
+.og-card-flat {
+  background: var(--og-paper);
+  border: 2px solid var(--og-ink);
+  border-radius: 18px;
+  padding: 18px;
+}
+
+.og-card-head {
+  margin: -24px -24px 20px;
+  padding: 14px 24px;
+  background: var(--og-accent);
+  border-bottom: 3px solid var(--og-ink);
+  border-radius: 21px 21px 0 0;
+}
+
+.og-sticker {
+  align-self: flex-start;
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--og-accent);
+  color: var(--og-ink);
+  border: 2px solid var(--og-ink);
+  font-family: var(--font-pixel), monospace;
+  font-size: 13px;
+  letter-spacing: 1px;
+  transform: rotate(-2deg);
+}
+
+.og-home .og-sticker {
+  background: var(--og-paper);
+}
+
+.og-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 2px solid var(--og-ink);
+  background: var(--og-paper);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.og-tone-good {
+  background: var(--og-good);
+}
+.og-tone-warn {
+  background: var(--og-warn);
+}
+.og-tone-bad {
+  background: var(--og-bad);
+}
+.og-tone-muted {
+  background: var(--og-muted);
+}
+.og-tone-accent {
+  background: var(--og-accent);
+}
+
+.og-tilt-l {
+  transform: rotate(-1deg);
+}
+.og-tilt-r {
+  transform: rotate(1deg);
+}
+
+/* ---------- Buttons and links ---------- */
+
+.og-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 14px;
+  border: 2px solid var(--og-ink);
+  background: var(--og-accent);
+  color: var(--og-ink);
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow: 3px 3px 0 var(--og-ink);
+  cursor: pointer;
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.08s ease;
+}
+
+.og-btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--og-ink);
+}
+
+.og-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--og-ink);
+}
+
+.og-btn-dark {
+  background: var(--og-ink);
+  color: #ffffff;
+}
+
+.og-link {
+  color: var(--og-ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.og-page a:focus-visible,
+.og-page button:focus-visible,
+.og-page input:focus-visible {
+  outline: 3px solid #2f6bff;
+  outline-offset: 3px;
+}
+
+/* ---------- Layout helpers ---------- */
+
+.og-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+  align-items: stretch;
+}
+
+.og-grow-2 {
+  flex: 2 1 560px;
+  min-width: 0;
+}
+
+.og-grow-1 {
+  flex: 1 1 300px;
+  min-width: 0;
+}
+
+.og-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.og-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.og-step {
+  flex: 1 1 230px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.og-step-num {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 2px solid var(--og-ink);
+  background: var(--og-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-pixel), monospace;
+  font-size: 18px;
+}
+
+.og-home .og-step-num {
+  background: var(--og-council);
+}
+
+.og-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+.og-lane {
+  border: 3px solid var(--og-ink);
+  border-radius: 22px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.og-scroll {
+  overflow-x: auto;
+}
+
+/* Keep existing daisyUI tables legible inside the new cards */
+.og-page .table {
+  font-size: 15px;
+}
+.og-page .table thead th {
+  color: var(--og-ink);
+  font-weight: 700;
+}
+.og-page .table tbody tr {
+  border-top: 2px dashed #b7d3cc;
+}

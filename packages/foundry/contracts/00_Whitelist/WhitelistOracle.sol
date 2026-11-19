@@ -60,7 +60,12 @@ contract WhitelistOracle {
      * @dev Creates a new SimpleOracle instance and adds it to the oracles array.
      * @param _owner The address that will own the newly created oracle and can update its price
      */
-    function addOracle(address _owner) public onlyOwner { }
+    function addOracle(address _owner) public onlyOwner {
+        SimpleOracle simpleOracle = new SimpleOracle(_owner);
+        address newOracle = address(simpleOracle);
+        oracles.push(simpleOracle);
+        emit OracleAdded(newOracle, _owner);
+    }
 
     /**
      * @notice Removes an oracle from the whitelist by its array index (only contract owner)
@@ -68,7 +73,19 @@ contract WhitelistOracle {
      *      Reverts with IndexOutOfBounds, if the provided index is >= oracles.length.
      * @param index The index of the oracle to remove from the oracles array
      */
-    function removeOracle(uint256 index) public onlyOwner { }
+
+    function removeOracle(uint256 index) public onlyOwner {
+        if (index >= oracles.length) {
+            revert IndexOutOfBounds();
+        }
+
+        address removedOracleAddress = address(oracles[index]);
+        if (index != oracles.length - 1) {
+            oracles[index] = oracles[oracles.length - 1];
+        }
+        oracles.pop();
+        emit OracleRemoved(removedOracleAddress);
+    }
 
     /**
      * @notice Returns the aggregated price from all active oracles using median calculation
@@ -76,7 +93,33 @@ contract WhitelistOracle {
      *      of remaining valid prices. Uses StatisticsUtils for sorting and median calculation.
      * @return The median price from all active oracles
      */
-    function getPrice() public view returns (uint256) { }
+    function getPrice() public view returns (uint256) {
+        if (oracles.length == 0) {
+            revert NoOraclesAvailable();
+        }
+
+        // collect fresh prices from all oracles
+        uint256[] memory prices = new uint256[](oracles.length);
+        uint256 validCount = 0;
+        uint256 currentTime = block.timestamp;
+
+        for (uint256 i = 0; i < oracles.length; i++) {
+            (uint256 price, uint256 timestamp) = oracles[i].getPrice();
+            if (currentTime - timestamp < STALE_DATA_WINDOW) {
+                prices[validCount] = price;
+                validCount++;
+            }
+        } // loop ends here
+
+        // right-size the array, then take the median
+        uint256[] memory validPrices = new uint256[](validCount);
+        for (uint256 j = 0; j < validCount; j++) {
+            validPrices[j] = prices[j];
+        }
+
+        validPrices.sort();
+        return validPrices.getMedian();
+    }
 
     /**
      * @notice Returns the addresses of all oracles that have updated their price within the last STALE_DATA_WINDOW
@@ -85,5 +128,22 @@ contract WhitelistOracle {
      *      for gas optimization.
      * @return An array of addresses representing the currently active oracle contracts
      */
-    function getActiveOracleNodes() public view returns (address[] memory) { }
+    function getActiveOracleNodes() public view returns (address[] memory) {
+        address[] memory tempNodes = new address[](oracles.length);
+        uint256 activeCount = 0;
+
+        for (uint256 i = 0; i < oracles.length; i++) {
+            (, uint256 timestamp) = oracles[i].getPrice();
+            if (block.timestamp - timestamp < STALE_DATA_WINDOW) {
+                tempNodes[activeCount] = address(oracles[i]);
+                activeCount++;
+            }
+        }
+
+        address[] memory activeNodes = new address[](activeCount);
+        for (uint256 j = 0; j < activeCount; j++) {
+            activeNodes[j] = tempNodes[j];
+        }
+        return activeNodes;
+    }
 }
